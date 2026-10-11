@@ -55,29 +55,38 @@ This design implements a **Cascade (Dual-Loop) Control Architecture** with frequ
 ```
 Cascade-Buck-Converter/
 ├── index.html                                        # Web-based interactive simulation studio
-├── styles.css                                        # Modern dark-theme stylesheet
+├── styles.css                                        # Clean minimal stylesheet
 ├── app.js                                            # Simulation engine and dynamic canvas renderer
 ├── README.md                                         # Project manual and technical documentation
-├── Cascade (Dual-Loop) Voltage-Current Control.pptx  # Project presentation deck
 ├── .gitignore                                        # Git version control ignore rules
 │
-├── docs/                                             # Technical notes and literature review
+├── Documentation/                                    # Technical documentation, guides & presentation
+│   ├── Cascade (Dual-Loop) Voltage-Current Control of a Buck Converter.pptx  # Project presentation deck
 │   ├── 10_papers_summary.md                          # Review of 10 relevant peer-reviewed papers
 │   ├── papers_breakdown.md                           # Comparative table and methodology analysis
-│   └── papers_deep_analysis.md                       # Quantitative benchmark of CC/CV transition
+│   ├── papers_deep_analysis.md                       # Quantitative benchmark of CC/CV transition
+│   ├── simulink_guide.md                             # Step-by-step Simulink and Simscape guide
+│   └── labview_guide.md                              # NI LabVIEW implementation and testing guide
 │
 ├── simulation/                                       # Simulation and mathematical modeling
-│   ├── cascade_buck_simulink.slx                     # Simulink system model
+│   ├── cascade_buck_simulink.slx                     # Simulink cascade dual-loop model
 │   ├── setup_cascade_buck_simulink.m                 # Automated MATLAB script for model creation
-│   ├── simulink_guide.md                             # Step-by-step Simulink and Simscape guide
-│   ├── plant_model.py                                # Python continuous/discrete simulation
+│   ├── plant_model.py                                # Python continuous/discrete ODE simulation
 │   ├── simulation_results.csv                        # Time-domain output data
-│   └── simulation_results.svg                        # Vector waveform plot
+│   ├── simulation_results.svg                        # Vector waveform plot
+│   ├── LTspice/                                      # LTspice circuit schematics (.asc)
+│   │   ├── Closed Loop.asc                           # Closed-loop buck converter schematic
+│   │   └── Industry_based_buck_converter.asc         # Industry-standard buck converter schematic
+│   └── Simulink/                                     # Additional Simscape/Simulink models
+│       └── BuckConverter.slx                         # Physical Simscape buck converter model
 │
 ├── firmware/                                         # Microcontroller implementation
 │   ├── cascade_control.h                             # Hardware-independent C header
 │   ├── cascade_control.c                             # PI controller core with anti-windup
 │   └── main_arduino.ino                              # Arduino Uno Timer 1 Fast PWM and 10 kHz ISR
+│
+├── LabView/                                          # NI LabVIEW implementation
+│   └── Dual loop DCDC converter.vi                   # LabVIEW Virtual Instrument (.vi)
 │
 └── papers/                                           # Reference literature library (10 PDF files)
 ```

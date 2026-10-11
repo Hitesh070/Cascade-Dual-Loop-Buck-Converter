@@ -12,3 +12,14 @@ __pycache__/
 # OS System Files
 .DS_Store
 Thumbs.db
+
+# MATLAB & Simulink Temporary Files
+*.slxc
+*.asv
+slprj/
+
+# LTspice Temporary Output Files
+*.raw
+*.op.raw
+*.log
+*.net
