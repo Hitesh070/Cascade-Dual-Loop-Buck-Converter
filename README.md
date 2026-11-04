@@ -219,6 +219,6 @@ TIMSK1 = _BV(OCIE1A);                          // Enable 10 kHz COMPA Interrupt 
 
 ## Author & License
 
-- **Author**: Hitesh V S (VIT Chennai)
+- **Developer**: Hitesh V S
 - **GitHub**: [@Hitesh070](https://github.com/Hitesh070)
 - **License**: Released under the [MIT License](LICENSE).
