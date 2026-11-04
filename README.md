@@ -1,37 +1,74 @@
 # Cascade (Dual-Loop) Voltage-Current Controlled Buck Converter
 
-A comprehensive hardware, simulation, and control systems design project implementing deterministic discrete-time dual-loop cascade control with soft-clamped overcurrent protection for a DC-DC Buck Converter (12V to 5V, 1.5A Maximum Current Limit).
+<p align="center">
+  <img src="https://img.shields.io/badge/Power_Electronics-DC--DC_Buck_12V_to_5V-F39C12?style=for-the-badge" alt="Power Electronics" />
+  <img src="https://img.shields.io/badge/MATLAB-Simulink%20%7C%20Simscape-0076A8?style=for-the-badge&logo=mathworks&logoColor=white" alt="Simulink" />
+  <img src="https://img.shields.io/badge/NI_LabVIEW-Virtual_Instrument-F4D03F?style=for-the-badge&logo=nationalinstruments&logoColor=black" alt="LabVIEW" />
+  <img src="https://img.shields.io/badge/Firmware-ATmega328P%20%7C%2010kHz_ISR-00979D?style=for-the-badge&logo=c&logoColor=white" alt="Firmware" />
+  <img src="https://img.shields.io/badge/Simulation-LTspice%20%7C%20Python_ODE-blue?style=for-the-badge" alt="Simulation" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License MIT" />
+</p>
+
+A deterministic hardware, simulation, and discrete-time control engineering framework implementing **Cascade (Dual-Loop) Voltage-Current Control with Soft-Clamped Overcurrent Saturation** for a DC-DC Buck Converter ($12\text{V} \rightarrow 5\text{V}$, $1.5\text{A}$ Maximum Current Ceiling).
 
 ---
 
-## 1. System Overview and Control Architecture
-
-A DC-DC Buck Converter steps down a higher DC input voltage ($V_{in} = 12\text{ V}$) to a regulated DC output voltage ($V_{out} = 5\text{ V}$) across a variable resistive load. While traditional single-loop voltage mode control relies solely on output voltage feedback, it exhibits slow transient response and lacks inherent current protection against short-circuit faults.
-
-This design implements a **Cascade (Dual-Loop) Control Architecture** with frequency-separated nested feedback loops:
-
-```
-[ V_ref ] ---> [ Outer Voltage PI Loop ] ---> [ Soft-Clamp Saturation ] ---> [ Inner Current PI Loop ] ---> [ PWM Generator ] ---> [ Buck Converter Plant ]
-                     (1 kHz / 1 ms)                 (Max I_ref = 1.5A)             (10 kHz / 100 us)              (10 kHz)                 (L, C, Load)
-                            ^                                                              ^                                                     |
-                            |                                                              |                                                     |
-                            +----------------- Voltage Feedback (V_out) -------------------+---------------- Inductor Current Feedback (I_L) ----+
-```
-
-### Control Loop Hierarchy
-1. **Outer Voltage Loop (1 kHz / 1 ms):**
-   - Regulates output voltage $V_{out}$ against target reference $V_{ref} = 5.0\text{ V}$.
-   - Computes the required inductor current reference $I_{ref}$.
-   - Implements anti-windup clamping and a hard software current ceiling ($I_{ref} \le 1.5\text{ A}$).
-
-2. **Inner Current Loop (10 kHz / 100 us):**
-   - Regulates instantaneous inductor current $I_L$ to track $I_{ref}$.
-   - Directly calculates the required PWM duty cycle $D$ with a feedforward compensation term ($V_{out} / V_{in}$).
-   - Operating at 10 times the outer loop bandwidth, it rejects line and load disturbances before they affect the output voltage.
+## Table of Contents
+- [System Overview & Control Architecture](#system-overview--control-architecture)
+- [Control Loop Hierarchy](#control-loop-hierarchy)
+- [Mathematical Modeling & PI Tuning](#mathematical-modeling--pi-tuning)
+- [Repository Structure](#repository-structure)
+- [Execution & Verification Instructions](#execution--verification-instructions)
+  - [1. Interactive Web Simulation Studio](#1-interactive-web-simulation-studio)
+  - [2. MATLAB / Simulink Simulation](#2-matlab--simulink-simulation)
+  - [3. Python ODE Mathematical Simulation](#3-python-ode-mathematical-simulation)
+  - [4. ATmega328P Hardware Deployment](#4-atmega328p-hardware-deployment)
+  - [5. NI LabVIEW HMI Telemetry](#5-ni-labview-hmi-telemetry)
+- [Performance Verification Benchmarks](#performance-verification-benchmarks)
+- [Academic Literature Review](#academic-literature-review)
+- [Author & License](#author--license)
 
 ---
 
-## 2. Mathematical Modeling and PI Tuning
+## System Overview & Control Architecture
+
+Traditional single-loop voltage mode control for DC-DC converters relies exclusively on output voltage error. Consequently, it suffers from slow transient recovery times, large voltage dips during sudden load steps, and zero inherent protection against output short-circuits.
+
+This project implements a **Dual-Loop Nested Cascade Architecture** with 10x frequency separation:
+
+```mermaid
+flowchart LR
+    Vref["V_ref (5.0V)"] --> CompV((+ -))
+    CompV --> OuterPI["Outer Voltage PI Loop\n(1 kHz / Ts = 1 ms)"]
+    OuterPI --> Clamp["Soft-Clamp Saturation\n(Max I_ref = 1.5A)"]
+    Clamp --> Iref["I_ref"]
+    Iref --> CompI((+ -))
+    CompI --> InnerPI["Inner Current PI Loop\n(10 kHz / Ts = 100 μs)"]
+    InnerPI --> FF["Feedforward Comp\n(D = D_pi + V_out/V_in)"]
+    FF --> PWM["10 kHz Fast PWM\n(Timer 1 Mode 14)"]
+    PWM --> Plant["Buck Converter Plant\n(L, C, Variable Load)"]
+
+    Plant -- "V_out (Voltage Sense)" --> CompV
+    Plant -- "I_L (Inductor Current)" --> CompI
+```
+
+---
+
+## Control Loop Hierarchy
+
+1. **Outer Voltage Loop ($f_{c,v} = 200\text{ Hz}$, $T_{s,v} = 1\text{ ms}$):**
+   - Regulates load output voltage $V_{out}$ against target reference $V_{ref} = 5.0\text{ V}$.
+   - Dynamically determines the required inductor reference current $I_{ref}$.
+   - Enforces integral anti-windup clamping and a hard software current ceiling ($I_{ref} \le 1.5\text{ A}$).
+
+2. **Inner Current Loop ($f_{c,i} = 2000\text{ Hz}$, $T_{s,i} = 100\ \mu\text{s}$):**
+   - High-bandwidth loop driving instantaneous inductor current $I_L$ to match $I_{ref}$.
+   - Directly synthesizes the required PWM duty cycle $D$ supplemented by feedforward compensation ($V_{out} / V_{in}$).
+   - Rejects line voltage fluctuations and sudden load swings before output capacitors deplete.
+
+---
+
+## Mathematical Modeling & PI Tuning
 
 ### Small-Signal Plant Transfer Functions
 - **Control-to-Current Transfer Function:**
@@ -50,19 +87,19 @@ This design implements a **Cascade (Dual-Loop) Control Architecture** with frequ
 
 ---
 
-## 3. Repository Structure
+## Repository Structure
 
-```
-Cascade-Buck-Converter/
+```text
 ├── index.html                                        # Web-based interactive simulation studio
-├── styles.css                                        # Clean minimal stylesheet
+├── styles.css                                        # Clean minimal UI stylesheet
 ├── app.js                                            # Simulation engine and dynamic canvas renderer
-├── README.md                                         # Project manual and technical documentation
 ├── .gitignore                                        # Git version control ignore rules
+├── LICENSE                                           # MIT License File
+├── README.md                                         # Project manual and technical documentation
 │
 ├── Documentation/                                    # Technical documentation, guides & presentation
-│   ├── Cascade (Dual-Loop) Voltage-Current Control of a Buck Converter.pptx  # Project presentation deck
-│   ├── 10_papers_summary.md                          # Review of 10 relevant peer-reviewed papers
+│   ├── Cascade (Dual-Loop) Voltage-Current Control of a Buck Converter.pptx # Project presentation deck
+│   ├── 10_papers_summary.md                          # Literature review of 10 relevant peer-reviewed papers
 │   ├── papers_breakdown.md                           # Comparative table and methodology analysis
 │   ├── papers_deep_analysis.md                       # Quantitative benchmark of CC/CV transition
 │   ├── simulink_guide.md                             # Step-by-step Simulink and Simscape guide
@@ -72,6 +109,7 @@ Cascade-Buck-Converter/
 │   ├── cascade_buck_simulink.slx                     # Simulink cascade dual-loop model
 │   ├── setup_cascade_buck_simulink.m                 # Automated MATLAB script for model creation
 │   ├── plant_model.py                                # Python continuous/discrete ODE simulation
+│   ├── cascade_buck_sim.py                           # Standalone simulation and waveform generation
 │   ├── simulation_results.csv                        # Time-domain output data
 │   ├── simulation_results.svg                        # Vector waveform plot
 │   ├── LTspice/                                      # LTspice circuit schematics (.asc)
@@ -88,27 +126,22 @@ Cascade-Buck-Converter/
 ├── LabView/                                          # NI LabVIEW implementation
 │   └── Dual loop DCDC converter.vi                   # LabVIEW Virtual Instrument (.vi)
 │
-└── papers/                                           # Reference literature library (10 PDF files)
+└── papers/                                           # Reference literature library (10 PDF papers)
 ```
 
 ---
 
-## 4. Execution and Verification Instructions
+## Execution & Verification Instructions
 
-### 4.1 Interactive Web Application UI
-The project includes a standalone, browser-based simulation interface that visualizes dynamic responses in real time.
+### 1. Interactive Web Simulation Studio
+Launch locally using Python HTTP server:
+```bash
+python -m http.server 8000
+```
+Open `http://localhost:8000` in any web browser. Adjust input voltage, target voltage, and load resistance to view real-time oscilloscope step responses and saturation clamping.
 
-- **Option A: Local Server**
-  ```bash
-  python -m http.server 8000
-  ```
-  Navigate to `http://localhost:8000` in any web browser.
-
-- **Option B: Direct Launch**
-  Open `index.html` directly in a browser.
-
-### 4.2 MATLAB / Simulink Simulation
-The script `simulation/setup_cascade_buck_simulink.m` programmatically constructs, parameterizes, and connects the complete dual-loop model in Simulink.
+### 2. MATLAB / Simulink Simulation
+The script `simulation/setup_cascade_buck_simulink.m` programmatically constructs, parameterizes, and connects the dual-loop model in Simulink.
 
 1. Open MATLAB.
 2. In the Command Window, navigate to the `simulation` directory:
@@ -116,24 +149,26 @@ The script `simulation/setup_cascade_buck_simulink.m` programmatically construct
    cd('simulation')
    setup_cascade_buck_simulink
    ```
-3. The script opens `cascade_buck_simulink.slx`.
-4. Click **Run** in Simulink to view response curves across the configured scopes:
-   - `Scope_Vout_Tracking`: Output voltage versus setpoint.
-   - `Scope_IL_Tracking`: Inductor current versus reference and 1.5A safety clamp.
+3. The script configures and opens `cascade_buck_simulink.slx`.
+4. Click **Run** in Simulink to view responses across:
+   - `Scope_Vout_Tracking`: Output voltage versus reference setpoint.
+   - `Scope_IL_Tracking`: Inductor current versus current ceiling ($1.5\text{A}$).
    - `Scope_Duty_Cycle`: PWM duty cycle commands.
    - `Cascade_Master_Dashboard`: Synchronized 3-channel display.
 
-### 4.3 Python Simulation Script
-To execute the discrete mathematical ODE simulation:
+### 3. Python ODE Mathematical Simulation
+To run the discrete mathematical ODE state-space simulation:
 ```bash
 python simulation/plant_model.py
+# or:
+python simulation/cascade_buck_sim.py
 ```
-Output results and performance metrics will be printed in the terminal, and dataset files will be updated in the `simulation/` directory.
+Performance metrics will print to console and update `simulation_results.csv` and `simulation_results.svg`.
 
-### 4.4 Arduino Uno Hardware Setup
-The firmware in `firmware/` runs deterministically on an ATmega328P (Arduino Uno) clocked at 16 MHz.
+### 4. ATmega328P Hardware Deployment
+Firmware in `firmware/` executes deterministically on an ATmega328P (Arduino Uno) clocked at 16 MHz.
 
-#### Pin Connections
+#### Pin Mapping
 | Arduino Pin | Connection | Function |
 | :--- | :--- | :--- |
 | **Pin 9 (OC1A)** | Gate Driver Input (IR2104 / TC4420) | 10 kHz Fast PWM Output (ICR1 = 1599, 1600 steps) |
@@ -148,35 +183,42 @@ TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);  // Prescaler = 1
 TIMSK1 = _BV(OCIE1A);                          // Enable 10 kHz COMPA Interrupt ISR
 ```
 
----
-
-## 5. Performance Verification Benchmarks
-
-| Metric | Proposed Soft-Clamped Cascade | Traditional Mode-Switching |
-| :--- | :--- | :--- |
-| **Settling Time (0 to 95% $V_{ref}$)** | 2.68 ms | 14.5 ms |
-| **Steady-State Voltage Error** | < 0.02 V | < 0.05 V |
-| **Step-Load Recovery ($10\ \Omega \rightarrow 3.33\ \Omega$)** | < 2.0 ms (70 mV drop) | 12.0 ms (450 mV drop) |
-| **Short-Circuit Inductor Current** | Clamped at 1.500 A | Unbounded / Relay Tripped |
-| **CC-to-CV Handover Current Spike** | 0.00 A (Bumpless) | +1.85 A (3.35 A Peak Surge) |
+### 5. NI LabVIEW HMI Telemetry
+1. Open NI LabVIEW.
+2. Load `LabView/Dual loop DCDC converter.vi`.
+3. Configure the VISA serial resource to observe dynamic loop performance and manual setpoint stepping.
 
 ---
 
-## 6. Academic References
+## Performance Verification Benchmarks
 
-1. N. Prameswari, A. B. Ganesen, F. K. Nuraziz, J. Furqani, A. Rizqiawan, and P. A. Dahono, "Simplified cascade multiphase DC-DC buck power converter for low voltage large current applications: part II --- output current controller," *Int. J. Power Electron. Drive Syst. (IJPEDS)*, vol. 12, no. 4, pp. 2273–2283, Dec. 2021, doi: 10.11591/ijpeds.v12.i4.pp2273-2283.
-2. G. I. Hasyim, S. Wijanarko, J. Furqani, A. Rizqiawan, and P. A. Dahono, "A current control method for bidirectional multiphase DC-DC boost-buck converter," *Int. J. Electr. Comput. Eng. (IJECE)*, vol. 12, no. 3, pp. 2363–2377, Jun. 2022, doi: 10.11591/ijece.v12i3.pp2363-2377.
-3. M. F. Akhtar, S. R. S. Raihan, N. A. Rahim, and M. K. Rahmat, "A Cascaded Synchronous Buck Converter for Light Electric Vehicle Charging Applications," *Int. J. Integr. Eng. (IJIE)*, vol. 16, no. 7, pp. 72–82, 2024, doi: 10.30880/ijie.2024.16.07.008.
-4. S. A. Tali, F. Ahmad, and I. H. Wani, "Design and Analysis of Feedback Control for DC-DC Buck Converter," in *New Frontiers in Communication and Intelligent Systems*, R. Srivastava and A. K. S. Pundir, Eds. India: Computing & Intelligent Systems, SCRS, 2021, pp. 319–328, doi: 10.52458/978-81-95502-00-4-33.
-5. H. Patel and A. Shah, "Boundary-Based PWM Control Scheme for a DC-DC Buck Converter Operating in CCM," *Trans. Energy Syst. Eng. Appl. (TESEA)*, vol. 4, no. 1, Art. no. 504, pp. 1–17, Apr. 2023, doi: 10.32397/tesea.vol4.n1.504.
-6. J.-B. Jeong, C.-G. Kim, J.-I. Kang, and S.-K. Han, "Two Independent Single-Loop Voltage Mode Control Method for 3-Level Buck Converter," *IEEE Access*, vol. 12, pp. 148113–148123, Oct. 2024, doi: 10.1109/ACCESS.2024.3476409.
-7. D. Angulo-Garcia, F. Angulo, G. Osorio, and G. Olivar, "Control of a DC-DC Buck Converter through Contraction Techniques," *Energies*, vol. 11, no. 11, Art. no. 3086, Nov. 2018, doi: 10.3390/en11113086.
-8. M. Gierczyński, L. M. Grzesiak, and A. Kaszewski, "Cascaded Voltage and Current Control for a Dual Active Bridge Converter with Current Filters," *Energies*, vol. 14, no. 19, Art. no. 6214, Sep. 2021, doi: 10.3390/en14196214.
-9. S. B. Hamed, M. B. Hamed, and L. Sbita, "Robust Voltage Control of a Buck DC-DC Converter: A Sliding Mode Approach," *Energies*, vol. 15, no. 17, Art. no. 6128, Aug. 2022, doi: 10.3390/en15176128.
-10. L. Xie, D. Wan, and R. Qin, "Dual-Loop Voltage–Current Control of a Fractional-Order Buck-Boost Converter Using a Fractional-Order PI^\lambda Controller," *Fractal Fract.*, vol. 7, no. 3, Art. no. 256, Mar. 2023, doi: 10.3390/fractalfract7030256.
+| Metric | Proposed Soft-Clamped Cascade | Traditional Single-Loop Mode-Switching |
+| :--- | :---: | :---: |
+| **Settling Time (0 to 95% $V_{ref}$)** | **2.68 ms** | 14.5 ms |
+| **Steady-State Voltage Error** | **< 0.02 V** | < 0.05 V |
+| **Step-Load Recovery ($10\ \Omega \rightarrow 3.33\ \Omega$)** | **< 2.0 ms (70 mV drop)** | 12.0 ms (450 mV drop) |
+| **Short-Circuit Inductor Current** | **Clamped at 1.500 A** | Unbounded / Relay Tripped |
+| **CC-to-CV Handover Current Spike** | **0.00 A (Bumpless)** | +1.85 A (3.35 A Peak Surge) |
 
 ---
 
-## 7. License
+## Academic Literature Review
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+1. N. Prameswari, et al., "Simplified cascade multiphase DC-DC buck power converter for low voltage large current applications: part II --- output current controller," *Int. J. Power Electron. Drive Syst.*, vol. 12, no. 4, pp. 2273–2283, 2021.
+2. G. I. Hasyim, et al., "A current control method for bidirectional multiphase DC-DC boost-buck converter," *Int. J. Electr. Comput. Eng.*, vol. 12, no. 3, pp. 2363–2377, 2022.
+3. M. F. Akhtar, et al., "A Cascaded Synchronous Buck Converter for Light Electric Vehicle Charging Applications," *Int. J. Integr. Eng.*, vol. 16, no. 7, pp. 72–82, 2024.
+4. S. A. Tali, et al., "Design and Analysis of Feedback Control for DC-DC Buck Converter," *New Frontiers in Communication and Intelligent Systems*, 2021.
+5. H. Patel and A. Shah, "Boundary-Based PWM Control Scheme for a DC-DC Buck Converter Operating in CCM," *Trans. Energy Syst. Eng. Appl.*, vol. 4, no. 1, 2023.
+6. J.-B. Jeong, et al., "Two Independent Single-Loop Voltage Mode Control Method for 3-Level Buck Converter," *IEEE Access*, vol. 12, pp. 148113–148123, 2024.
+7. D. Angulo-Garcia, et al., "Control of a DC-DC Buck Converter through Contraction Techniques," *Energies*, vol. 11, no. 11, 2018.
+8. M. Gierczyński, et al., "Cascaded Voltage and Current Control for a Dual Active Bridge Converter with Current Filters," *Energies*, vol. 14, no. 19, 2021.
+9. S. B. Hamed, et al., "Robust Voltage Control of a Buck DC-DC Converter: A Sliding Mode Approach," *Energies*, vol. 15, no. 17, 2022.
+10. L. Xie, et al., "Dual-Loop Voltage–Current Control of a Fractional-Order Buck-Boost Converter Using a Fractional-Order PI^\lambda Controller," *Fractal Fract.*, vol. 7, no. 3, 2023.
+
+---
+
+## Author & License
+
+- **Author**: Hitesh V S (VIT Chennai)
+- **GitHub**: [@Hitesh070](https://github.com/Hitesh070)
+- **License**: Released under the [MIT License](LICENSE).
