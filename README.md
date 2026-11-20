@@ -110,23 +110,38 @@ flowchart LR
 ### Mathematical Modeling & PI Tuning
 
 #### Small-Signal Transfer Functions
-- **Duty-to-Current Transfer Function**:
-  $$G_{id}(s) \approx \frac{V_{\text{in}}}{s L}$$
-- **Current-to-Voltage Transfer Function**:
-  $$G_{vi}(s) \approx \frac{1}{s C + \frac{1}{R}}$$
+
+**Duty-to-Current Transfer Function**:
+$$
+G_{id}(s) \approx \frac{V_{\text{in}}}{s L}
+$$
+
+**Current-to-Voltage Transfer Function**:
+$$
+G_{vi}(s) \approx \frac{1}{s C + \frac{1}{R}}
+$$
 
 #### Discrete Controller Gains (10x Bandwidth Separation Rule)
-- **Inner Current Loop ($f_{c,i} = 2000\text{ Hz}$, $T_{s,i} = 100\ \mu\text{s}$)**:
-  - Proportional Gain:
-    $$K_{p,i} = \frac{\omega_{c,i} L}{V_{\text{in}}} = \frac{2\pi \cdot 2000 \cdot 100 \times 10^{-6}}{12.0} = 0.104720$$
-  - Integral Gain:
-    $$K_{i,i} = K_{p,i} \cdot \omega_z = 0.104720 \cdot 212.76 = 22.280799$$
-- **Outer Voltage Loop ($f_{c,v} = 200\text{ Hz}$, $T_{s,v} = 1\text{ ms}$)**:
-  - Proportional Gain:
-    $$K_{p,v} = \omega_{c,v} C = 2\pi \cdot 200 \cdot 470 \times 10^{-6} = 0.590619$$
-  - Integral Gain:
-    $$K_{i,v} = K_{p,v} \cdot \omega_z = 0.590619 \cdot 212.76 = 125.663706$$
-  - Where plant zero $\omega_z = \frac{1}{R C} \approx 212.76\text{ rad/s}$ ($R=10\ \Omega, C=470\ \mu\text{F}$).
+
+**Inner Current Loop ($f_{c,i} = 2000\text{ Hz}$, $T_{s,i} = 100\ \mu\text{s}$)**:
+$$
+K_{p,i} = \frac{\omega_{c,i} L}{V_{\text{in}}} = \frac{2\pi \cdot 2000 \cdot 100 \times 10^{-6}}{12.0} = 0.104720
+$$
+
+$$
+K_{i,i} = K_{p,i} \cdot \omega_z = 0.104720 \cdot 212.76 = 22.280799
+$$
+
+**Outer Voltage Loop ($f_{c,v} = 200\text{ Hz}$, $T_{s,v} = 1\text{ ms}$)**:
+$$
+K_{p,v} = \omega_{c,v} C = 2\pi \cdot 200 \cdot 470 \times 10^{-6} = 0.590619
+$$
+
+$$
+K_{i,v} = K_{p,v} \cdot \omega_z = 0.590619 \cdot 212.76 = 125.663706
+$$
+
+Where plant zero $\omega_z = \frac{1}{R C} \approx 212.76\text{ rad/s}$ ($R=10\ \Omega, C=470\ \mu\text{F}$).
 
 ---
 
